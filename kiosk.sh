@@ -24,8 +24,7 @@ xset s off
 xset s noblank
 xset -dpms
 
-# Hide cursor
-unclutter -idle 1 -root &
+# NOTE: unclutter intentionally removed — bluetooth mouse cursor must be visible
 
 # Launch Chromium in kiosk mode
 chromium \

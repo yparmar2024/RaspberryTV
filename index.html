@@ -74,6 +74,17 @@
     .btn-ghost:hover, .btn-ghost:focus-visible { border-color: var(--accent); color: var(--accent); }
     .btn-sm { padding: 0.5rem 1.1rem; font-size: 0.88rem; }
 
+    /* ── Keyboard button ── */
+    #kbdBtn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--surface); border: 1.5px solid var(--border);
+      color: var(--muted); font-size: 1.1rem; flex-shrink: 0;
+      transition: all 0.15s; cursor: pointer;
+    }
+    #kbdBtn:hover { border-color: var(--accent); color: var(--accent); }
+    #kbdBtn.active { background: rgba(232,0,61,0.15); border-color: var(--accent); color: var(--accent); }
+
     /* Filter tabs */
     .tabs { display: flex; gap: 0.5rem; padding: 0.5rem 3rem 0; }
     .tab {
@@ -243,6 +254,8 @@
         <input id="searchInput" type="text" placeholder="Search movies & TV shows…" autocomplete="off" spellcheck="false" />
         <span class="search-icon">🔍</span>
       </div>
+      <!-- On-screen keyboard toggle — calls /api/keyboard on the Pi -->
+      <button id="kbdBtn" title="Toggle on-screen keyboard">⌨</button>
       <button id="searchBtn" class="btn btn-red">Search</button>
     </div>
   </header>
@@ -269,6 +282,7 @@
     <span><kbd>Enter</kbd> Select</span>
     <span><kbd>Esc</kbd> Back</span>
     <span><kbd>H</kbd> Home</span>
+    <span><kbd>⌨</kbd> Keyboard</span>
   </div>
 </div>
 
@@ -311,22 +325,16 @@ const socket = io();
 socket.on("command", handleRemoteCommand);
 
 function modalMove(cmd) {
-  // Find all visible interactive elements in the modal
   const focusables = Array.from(detailPanel.querySelectorAll("button, [tabindex='0'], select"))
-    .filter(el => el.offsetParent !== null); // Ensure they are not display:none
-  
+    .filter(el => el.offsetParent !== null);
   if (!focusables.length) return;
-
   let idx = focusables.indexOf(document.activeElement);
   if (idx < 0) idx = 0;
-
-  // Cycle focus based on D-pad direction
   if (cmd === "up" || cmd === "left") {
     idx = (idx - 1 + focusables.length) % focusables.length;
   } else if (cmd === "down" || cmd === "right") {
     idx = (idx + 1) % focusables.length;
   }
-  
   focusables[idx].focus();
 }
 
@@ -335,15 +343,12 @@ function handleRemoteCommand({ cmd, query }) {
     if (cmd === "back") closePlayer();
     return;
   }
-  
-  // NEW: Handle D-pad and Enter inside the Detail Panel
   if (document.getElementById("detailPanel").classList.contains("open")) {
     if (cmd === "back") closeDetail();
     else if (["up", "down", "left", "right"].includes(cmd)) modalMove(cmd);
     else if (cmd === "enter" && document.activeElement) document.activeElement.click();
     return;
   }
-  
   switch (cmd) {
     case "up":    gridMove(-1, "row"); break;
     case "down":  gridMove(1, "row");  break;
@@ -360,23 +365,23 @@ function handleRemoteCommand({ cmd, query }) {
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const searchInput   = $("searchInput");
-const searchBtn     = $("searchBtn");
-const trendingGrid  = $("trendingGrid");
+const searchInput     = $("searchInput");
+const searchBtn       = $("searchBtn");
+const trendingGrid    = $("trendingGrid");
 const trendingSection = $("trendingSection");
 const resultsSection  = $("resultsSection");
-const resultsGrid   = $("resultsGrid");
-const resultsLabel  = $("resultsLabel");
-const detailPanel   = $("detailPanel");
-const detailInner   = $("detailInner");
-const playerPanel   = $("playerPanel");
-const playerBack    = $("playerBack");
-const playerTitle   = $("playerTitle");
-const vidFrame      = $("vidFrame");
-const playerEpNav   = $("playerEpNav");
-const playerSeason  = $("playerSeason");
-const playerEp      = $("playerEp");
-const playerLoad    = $("playerLoad");
+const resultsGrid     = $("resultsGrid");
+const resultsLabel    = $("resultsLabel");
+const detailPanel     = $("detailPanel");
+const detailInner     = $("detailInner");
+const playerPanel     = $("playerPanel");
+const playerBack      = $("playerBack");
+const playerTitle     = $("playerTitle");
+const vidFrame        = $("vidFrame");
+const playerEpNav     = $("playerEpNav");
+const playerSeason    = $("playerSeason");
+const playerEp        = $("playerEp");
+const playerLoad      = $("playerLoad");
 
 // ── Toast ────────────────────────────────────────────────────────────────────
 let toastTimer;
@@ -388,13 +393,50 @@ function toast(msg, dur = 2600) {
   toastTimer = setTimeout(() => el.classList.remove("show"), dur);
 }
 
-// ── Escape HTML ──────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function esc(s) {
   return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 function fmtRuntime(m) {
   if (!m) return "";
   return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`;
+}
+
+// ── On-screen keyboard ───────────────────────────────────────────────────────
+// Toggles matchbox-keyboard on the Pi via the Flask /api/keyboard endpoint.
+// The ⌨ button lights up red when the keyboard is open.
+let kbdOpen = false;
+const kbdBtn = $("kbdBtn");
+
+kbdBtn.addEventListener("click", toggleKeyboard);
+
+// Auto-open when the search input is clicked/focused with a mouse
+searchInput.addEventListener("pointerdown", () => {
+  if (!kbdOpen) toggleKeyboard();
+});
+
+// Auto-close when search input loses focus (user clicked elsewhere)
+searchInput.addEventListener("blur", () => {
+  if (kbdOpen) {
+    // Small delay so clicking the keyboard itself doesn't close it
+    setTimeout(() => {
+      if (document.activeElement !== searchInput) toggleKeyboard();
+    }, 200);
+  }
+});
+
+async function toggleKeyboard() {
+  kbdOpen = !kbdOpen;
+  kbdBtn.classList.toggle("active", kbdOpen);
+  try {
+    await fetch("/api/keyboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: kbdOpen ? "show" : "hide" })
+    });
+  } catch (e) {
+    console.warn("Keyboard toggle failed:", e);
+  }
 }
 
 // ── Card builder ─────────────────────────────────────────────────────────────
@@ -463,6 +505,8 @@ function goHome() {
 async function doSearch() {
   const q = searchInput.value.trim();
   if (!q) return;
+  // Close keyboard after submitting search
+  if (kbdOpen) toggleKeyboard();
   trendingSection.style.display = "none";
   resultsSection.style.display = "block";
   resultsLabel.innerHTML = `Searching…`;
@@ -511,7 +555,6 @@ async function openDetail(tmdbId, type) {
 
 function renderDetail(d) {
   const isTV = d.type === "tv";
-
   if (d.backdrop) $("detailBg").src = d.backdrop;
 
   const stats = [];
@@ -558,7 +601,6 @@ function renderDetail(d) {
 
   $("detailClose").addEventListener("click", closeDetail);
 
-  // Actions
   const actions = $("dActions");
   if (isTV) {
     const wb = document.createElement("button");
@@ -723,17 +765,14 @@ function keyboardGridNav(key) {
   const activeGrid = resultsSection.style.display !== "none" ? resultsGrid : trendingGrid;
   const cards = Array.from(activeGrid.querySelectorAll(".card"));
   if (!cards.length) return;
-
   let idx = S.focusedCard ? cards.indexOf(S.focusedCard) : -1;
   if (idx < 0) { cards[0].focus(); return; }
-
   const cols = Math.round(activeGrid.offsetWidth / cards[0].offsetWidth);
   let next = idx;
   if (key === "ArrowRight") next = idx + 1;
   if (key === "ArrowLeft")  next = idx - 1;
   if (key === "ArrowDown")  next = idx + cols;
   if (key === "ArrowUp")    next = idx - cols;
-
   if (next >= 0 && next < cards.length) { cards[next].focus(); S.focusedCard = cards[next]; }
 }
 

@@ -1,4 +1,5 @@
 import os
+import subprocess
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -13,34 +14,63 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "raspberrytv-secret")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# Updated: Fetching the Read Access Token instead of the standard v3 API Key
 TMDB_ACCESS_TOKEN = os.getenv("TMDB_ACCESS_TOKEN", "")
-TMDB_URL = "https://api.themoviedb.org/3"
-TMDB_IMG = "https://image.tmdb.org/t/p/w500"
+TMDB_URL    = "https://api.themoviedb.org/3"
+TMDB_IMG    = "https://image.tmdb.org/t/p/w500"
 TMDB_IMG_LG = "https://image.tmdb.org/t/p/w1280"
 TMDB_IMG_SM = "https://image.tmdb.org/t/p/w300"
 
 
 def tmdb(path, params=None):
-    # Updated: Using headers for Bearer Auth & explicitly accepting JSON per TMDB docs
     headers = {
         "accept": "application/json",
         "Authorization": f"Bearer {TMDB_ACCESS_TOKEN}"
     }
-    
     try:
-        # The params no longer need the api_key merged into them
         r = requests.get(f"{TMDB_URL}{path}", headers=headers, params=params, timeout=8)
         return r.json() if r.status_code == 200 else None
     except Exception:
         return None
 
 
+# ── On-screen keyboard ────────────────────────────────────────────────────────
+# Uses matchbox-keyboard. Install with: sudo apt install matchbox-keyboard
+
+_kbd_proc = None
+
+@app.route("/api/keyboard", methods=["POST"])
+def api_keyboard():
+    global _kbd_proc
+    data   = request.get_json(silent=True) or {}
+    action = data.get("action", "toggle")
+
+    if action == "show" or (action == "toggle" and (_kbd_proc is None or _kbd_proc.poll() is not None)):
+        if _kbd_proc and _kbd_proc.poll() is None:
+            _kbd_proc.terminate()
+        try:
+            _kbd_proc = subprocess.Popen(
+                ["matchbox-keyboard"],
+                env={**os.environ, "DISPLAY": ":0", "XAUTHORITY": "/home/rpitv/.Xauthority"}
+            )
+            return jsonify({"status": "shown"})
+        except FileNotFoundError:
+            return jsonify({"error": "matchbox-keyboard not installed — run: sudo apt install matchbox-keyboard"}), 500
+
+    elif action == "hide" or action == "toggle":
+        if _kbd_proc and _kbd_proc.poll() is None:
+            _kbd_proc.terminate()
+            _kbd_proc = None
+        subprocess.run(["pkill", "-f", "matchbox-keyboard"], capture_output=True)
+        return jsonify({"status": "hidden"})
+
+    return jsonify({"error": "invalid action"}), 400
+
+
 # ── Search ────────────────────────────────────────────────────────────────────
 
 @app.route("/api/search")
 def api_search():
-    q = request.args.get("q", "").strip()
+    q    = request.args.get("q", "").strip()
     kind = request.args.get("type", "multi")
     if not q:
         return jsonify({"error": "missing q"}), 400
@@ -64,12 +94,12 @@ def api_search():
             continue
         poster = item.get("poster_path")
         results.append({
-            "tmdbId": item["id"],
-            "type": media,
-            "title": item.get("title") or item.get("name", "Unknown"),
-            "poster": f"{TMDB_IMG}{poster}" if poster else None,
-            "year": (item.get("release_date") or item.get("first_air_date") or "")[:4],
-            "rating": round(item.get("vote_average", 0), 1),
+            "tmdbId":   item["id"],
+            "type":     media,
+            "title":    item.get("title") or item.get("name", "Unknown"),
+            "poster":   f"{TMDB_IMG}{poster}" if poster else None,
+            "year":     (item.get("release_date") or item.get("first_air_date") or "")[:4],
+            "rating":   round(item.get("vote_average", 0), 1),
             "overview": item.get("overview", ""),
         })
 
@@ -92,9 +122,9 @@ def api_details(media_type, tmdb_id):
     genres   = [g["name"] for g in data.get("genres", [])]
     cast     = [
         {
-            "name": p["name"],
+            "name":      p["name"],
             "character": p.get("character", ""),
-            "photo": f"{TMDB_IMG}{p['profile_path']}" if p.get("profile_path") else None,
+            "photo":     f"{TMDB_IMG}{p['profile_path']}" if p.get("profile_path") else None,
         }
         for p in data.get("credits", {}).get("cast", [])[:8]
     ]
@@ -176,12 +206,12 @@ def api_trending():
             continue
         poster = item.get("poster_path")
         results.append({
-            "tmdbId":  item["id"],
-            "type":    media,
-            "title":   item.get("title") or item.get("name", "Unknown"),
-            "poster":  f"{TMDB_IMG}{poster}" if poster else None,
-            "year":    (item.get("release_date") or item.get("first_air_date") or "")[:4],
-            "rating":  round(item.get("vote_average", 0), 1),
+            "tmdbId":   item["id"],
+            "type":     media,
+            "title":    item.get("title") or item.get("name", "Unknown"),
+            "poster":   f"{TMDB_IMG}{poster}" if poster else None,
+            "year":     (item.get("release_date") or item.get("first_air_date") or "")[:4],
+            "rating":   round(item.get("vote_average", 0), 1),
             "overview": item.get("overview", ""),
         })
 
@@ -202,7 +232,6 @@ def handle_command(data):
         payload["query"] = data.get("query", "").strip()
     emit("command", payload, broadcast=True, include_self=False)
 
-# --- Mouse Control Listeners ---
 @socketio.on("mousemove")
 def handle_mousemove(data):
     try:
@@ -220,7 +249,7 @@ def handle_click():
         mouse.click(Button.left, 1)
     except Exception as e:
         print(f"Mouse click error: {e}")
-# ------------------------------------
+
 
 # ── Static ────────────────────────────────────────────────────────────────────
 
