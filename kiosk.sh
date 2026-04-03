@@ -16,7 +16,7 @@ for i in $(seq 1 30); do
 done
 
 # Start X + Openbox in background
-startx /usr/bin/openbox-session -- :0 vt1 &
+startx /usr/bin/openbox -- :0 vt1 &
 sleep 4
 
 # Disable screen blanking
