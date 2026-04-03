@@ -1,0 +1,19 @@
+[Unit]
+Description=RaspberryTV Flask App
+After=network.target
+
+[Service]
+User=rpitv
+WorkingDirectory=/home/rpitv/RaspberryTV
+EnvironmentFile=/home/rpitv/RaspberryTV/.env
+ExecStart=/home/rpitv/RaspberryTV/venv/bin/gunicorn \
+    --worker-class eventlet \
+    --workers 1 \
+    --bind 0.0.0.0:5000 \
+    --timeout 30 \
+    "app:app"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

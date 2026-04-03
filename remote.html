@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>TV Remote</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg:     #080810;
+      --card:   #14141e;
+      --card-h: #1c1c2a;
+      --border: #222234;
+      --accent: #e8003d;
+      --text:   #eeeef8;
+      --muted:  #666688;
+      --r:      14px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden; user-select: none; -webkit-user-select: none;
+    }
+    .app {
+      display: flex; flex-direction: column;
+      height: 100dvh;
+      padding: max(env(safe-area-inset-top), 16px) 16px max(env(safe-area-inset-bottom), 16px) 16px;
+      gap: 14px;
+    }
+
+    /* Header */
+    .hdr { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .logo { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.04em; }
+    .logo span { color: var(--accent); }
+    .conn { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+    .dot.on { background: #4caf50; }
+    .dot.err { background: var(--accent); }
+
+    /* Search row */
+    .search-row { display: flex; gap: 8px; flex-shrink: 0; }
+    .search-input {
+      flex: 1; background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 50px; color: var(--text); font-size: 1rem;
+      padding: 0.7rem 1.1rem; outline: none; -webkit-appearance: none;
+      transition: border-color 0.15s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+    .search-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 50px;
+      font-size: 0.9rem; font-weight: 600; padding: 0 1.1rem; cursor: pointer;
+      white-space: nowrap; transition: background 0.15s, transform 0.1s;
+    }
+    .search-btn:active { transform: scale(0.94); background: #c4002e; }
+
+    /* D-pad */
+    .dpad-wrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 8px;
+      width: min(260px, 70vw);
+      aspect-ratio: 1;
+    }
+    .dp {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--r); display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; cursor: pointer; touch-action: manipulation;
+      transition: background 0.1s, transform 0.08s, border-color 0.1s;
+    }
+    .dp:active { background: var(--card-h); border-color: var(--accent); transform: scale(0.91); }
+    .dp.ok {
+      background: var(--accent); border-color: var(--accent);
+      font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: 0.05em;
+    }
+    .dp.ok:active { background: #c4002e; transform: scale(0.91); }
+    .dp.empty { background: none; border-color: transparent; pointer-events: none; }
+
+    /* Trackpad Overlay */
+    #trackpadModal {
+      position: fixed; inset: 0; z-index: 500; background: rgba(8,8,16,0.95);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s; touch-action: none;
+    }
+    #trackpadModal.show { opacity: 1; pointer-events: auto; }
+    .tp-area {
+      flex: 1; width: 100%; border: 2px dashed var(--border); border-radius: 20px;
+      margin: 20px; display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 1.2rem; font-weight: 600; letter-spacing: 0.1em;
+      background: var(--card);
+    }
+    .tp-close { margin-bottom: 30px; padding: 15px 40px; background: var(--accent); color: white; border: none; border-radius: 50px; font-size: 1rem; font-weight: bold; }
+
+    /* Action row */
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0; }
+    .act {
+      background: var(--card); border: 1.5px solid var(--border); border-radius: var(--r);
+      color: var(--text); font-size: 0.9rem; font-weight: 600; padding: 0.9rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 7px; touch-action: manipulation;
+      transition: background 0.1s, transform 0.08s, border-color 0.1s;
+    }
+    .act:active { background: var(--card-h); border-color: var(--accent); transform: scale(0.95); }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: calc(max(env(safe-area-inset-bottom), 16px) + 8px); left: 50%;
+      transform: translateX(-50%) translateY(60px);
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 0.55rem 1.1rem; border-radius: 50px; font-size: 0.82rem;
+      pointer-events: none; transition: transform 0.25s ease; white-space: nowrap; z-index: 100;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div class="logo">Raspberry<span>TV</span> Remote</div>
+    <div class="conn">
+      <div class="dot" id="dot"></div>
+      <span id="connText">Connecting…</span>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <input id="searchInput" class="search-input" type="search"
+      placeholder="Search on TV…" autocomplete="off" autocorrect="off"
+      autocapitalize="off" spellcheck="false" enterkeyhint="search" />
+    <button class="search-btn" id="searchBtn">Search</button>
+  </div>
+
+  <div class="dpad-wrap">
+    <div class="dpad">
+      <div class="dp empty"></div>
+      <div class="dp" data-cmd="up">▲</div>
+      <div class="dp empty"></div>
+      <div class="dp" data-cmd="left">◀</div>
+      <div class="dp ok" data-cmd="enter">OK</div>
+      <div class="dp" data-cmd="right">▶</div>
+      <div class="dp empty"></div>
+      <div class="dp" data-cmd="down">▼</div>
+      <div class="dp empty"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="act" data-cmd="back">⬅ Back</button>
+    <button class="act" data-cmd="home">🏠 Home</button>
+    <button class="act" id="openTrackpad">🖱️ Trackpad</button> </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="trackpadModal">
+  <div class="tp-area" id="tpArea">DRAG TO MOVE • TAP TO CLICK</div>
+  <button class="tp-close" id="closeTrackpad">Close Trackpad</button>
+</div>
+
+<script>
+  const dot      = document.getElementById("dot");
+  const connText = document.getElementById("connText");
+  const searchInput = document.getElementById("searchInput");
+  const searchBtn   = document.getElementById("searchBtn");
+
+  // WebSocket connection
+  const socket = io();
+
+  socket.on("connect", () => {
+    dot.className = "dot on";
+    connText.textContent = "Connected";
+  });
+  socket.on("disconnect", () => {
+    dot.className = "dot err";
+    connText.textContent = "Disconnected";
+  });
+  socket.on("connect_error", () => {
+    dot.className = "dot err";
+    connText.textContent = "Error";
+  });
+
+  // Toast
+  let toastTimer;
+  function showToast(msg, dur = 1600) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), dur);
+  }
+
+  // Send command
+  function send(cmd, extra = {}) {
+    socket.emit("command", { cmd, ...extra });
+  }
+
+  // D-pad + action buttons
+  document.querySelectorAll("[data-cmd]").forEach(btn => {
+    btn.addEventListener("touchstart", e => {
+      e.preventDefault();
+      send(btn.dataset.cmd);
+    }, { passive: false });
+    btn.addEventListener("click", () => send(btn.dataset.cmd));
+  });
+
+  // --- Trackpad Logic ---
+  const tpModal = document.getElementById("trackpadModal");
+  const tpArea = document.getElementById("tpArea");
+  
+  document.getElementById("openTrackpad").addEventListener("click", () => tpModal.classList.add("show"));
+  document.getElementById("closeTrackpad").addEventListener("click", () => tpModal.classList.remove("show"));
+
+  let lastX = 0, lastY = 0;
+  let isTap = false;
+  let SENSITIVITY = 1.8; // Multiplier to make the mouse move faster across the TV
+
+  tpArea.addEventListener("touchstart", e => {
+    e.preventDefault();
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+    isTap = true; // Assume it's a tap until they move
+  }, { passive: false });
+
+  tpArea.addEventListener("touchmove", e => {
+    e.preventDefault();
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    
+    const dx = (currentX - lastX) * SENSITIVITY;
+    const dy = (currentY - lastY) * SENSITIVITY;
+    
+    // If they moved their finger enough, it's a drag, not a tap
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) isTap = false;
+
+    socket.emit("mousemove", { dx, dy });
+    
+    lastX = currentX;
+    lastY = currentY;
+  }, { passive: false });
+
+  tpArea.addEventListener("touchend", e => {
+    e.preventDefault();
+    if (isTap) {
+      socket.emit("click");
+      showToast("Clicked!");
+    }
+  }, { passive: false });
+
+  // Search
+  function sendSearch() {
+    const query = searchInput.value.trim();
+    if (!query) { searchInput.focus(); return; }
+    searchInput.blur();
+    send("search", { query });
+    showToast(`Searching: ${query}`);
+    searchInput.value = "";
+  }
+
+  searchBtn.addEventListener("click", sendSearch);
+  searchInput.addEventListener("keydown", e => { if (e.key === "Enter") sendSearch(); });
+</script>
+</body>
+</html>
