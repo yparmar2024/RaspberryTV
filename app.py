@@ -4,11 +4,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 
-# --- NEW: Import pynput and force X11 Display targeting ---
-os.environ["DISPLAY"] = ":0"  # Crucial: Tells the background script which TV to use
-from pynput.mouse import Controller, Button
-mouse = Controller()
-# ----------------------------------------------------------
+os.environ["DISPLAY"] = ":0"
+os.environ["XAUTHORITY"] = "/home/rpitv/.Xauthority"
 
 load_dotenv()
 
@@ -205,21 +202,24 @@ def handle_command(data):
         payload["query"] = data.get("query", "").strip()
     emit("command", payload, broadcast=True, include_self=False)
 
-# --- NEW: Mouse Control Listeners ---
+# --- Mouse Control Listeners ---
 @socketio.on("mousemove")
 def handle_mousemove(data):
     try:
-        # Move the mouse relative to its current position
+        from pynput.mouse import Controller
+        mouse = Controller()
         mouse.move(float(data.get("dx", 0)), float(data.get("dy", 0)))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Mouse move error: {e}")
 
 @socketio.on("click")
 def handle_click():
     try:
+        from pynput.mouse import Controller, Button
+        mouse = Controller()
         mouse.click(Button.left, 1)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Mouse click error: {e}")
 # ------------------------------------
 
 # ── Static ────────────────────────────────────────────────────────────────────
