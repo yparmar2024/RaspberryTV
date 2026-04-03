@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 
+# Needed for the on-screen keyboard to show up on the TV
 os.environ["DISPLAY"] = ":0"
 os.environ["XAUTHORITY"] = "/home/rpitv/.Xauthority"
 
@@ -34,7 +35,6 @@ def tmdb(path, params=None):
 
 
 # ── On-screen keyboard ────────────────────────────────────────────────────────
-# Uses matchbox-keyboard. Install with: sudo apt install matchbox-keyboard
 
 _kbd_proc = None
 
@@ -54,7 +54,7 @@ def api_keyboard():
             )
             return jsonify({"status": "shown"})
         except FileNotFoundError:
-            return jsonify({"error": "matchbox-keyboard not installed — run: sudo apt install matchbox-keyboard"}), 500
+            return jsonify({"error": "matchbox-keyboard not installed"}), 500
 
     elif action == "hide" or action == "toggle":
         if _kbd_proc and _kbd_proc.poll() is None:
@@ -231,24 +231,6 @@ def handle_command(data):
     if cmd == "search":
         payload["query"] = data.get("query", "").strip()
     emit("command", payload, broadcast=True, include_self=False)
-
-@socketio.on("mousemove")
-def handle_mousemove(data):
-    try:
-        from pynput.mouse import Controller
-        mouse = Controller()
-        mouse.move(float(data.get("dx", 0)), float(data.get("dy", 0)))
-    except Exception as e:
-        print(f"Mouse move error: {e}")
-
-@socketio.on("click")
-def handle_click():
-    try:
-        from pynput.mouse import Controller, Button
-        mouse = Controller()
-        mouse.click(Button.left, 1)
-    except Exception as e:
-        print(f"Mouse click error: {e}")
 
 
 # ── Static ────────────────────────────────────────────────────────────────────
