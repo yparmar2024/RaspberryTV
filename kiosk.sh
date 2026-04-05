@@ -26,7 +26,7 @@ xset -dpms
 
 # NOTE: unclutter intentionally removed — bluetooth mouse cursor must be visible
 
-# Launch Chromium in kiosk mode
+# Launch Chromium in kiosk mode with GPU acceleration
 chromium \
   --kiosk \
   --noerrdialogs \
@@ -36,4 +36,8 @@ chromium \
   --disable-features=TranslateUI \
   --no-first-run \
   --check-for-update-interval=31536000 \
+  --ignore-gpu-blocklist \
+  --enable-zero-copy \
+  --enable-features=VaapiVideoDecoder \
+  --use-gl=egl \
   http://localhost:5000
