@@ -1,11 +1,9 @@
 import os
-import subprocess
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 
-# Needed for the on-screen keyboard to show up on the TV
 os.environ["DISPLAY"] = ":0"
 os.environ["XAUTHORITY"] = "/home/rpitv/.Xauthority"
 
@@ -32,38 +30,6 @@ def tmdb(path, params=None):
         return r.json() if r.status_code == 200 else None
     except Exception:
         return None
-
-
-# ── On-screen keyboard ────────────────────────────────────────────────────────
-
-_kbd_proc = None
-
-@app.route("/api/keyboard", methods=["POST"])
-def api_keyboard():
-    global _kbd_proc
-    data   = request.get_json(silent=True) or {}
-    action = data.get("action", "toggle")
-
-    if action == "show" or (action == "toggle" and (_kbd_proc is None or _kbd_proc.poll() is not None)):
-        if _kbd_proc and _kbd_proc.poll() is None:
-            _kbd_proc.terminate()
-        try:
-            _kbd_proc = subprocess.Popen(
-                ["matchbox-keyboard"],
-                env={**os.environ, "DISPLAY": ":0", "XAUTHORITY": "/home/rpitv/.Xauthority"}
-            )
-            return jsonify({"status": "shown"})
-        except FileNotFoundError:
-            return jsonify({"error": "matchbox-keyboard not installed"}), 500
-
-    elif action == "hide" or action == "toggle":
-        if _kbd_proc and _kbd_proc.poll() is None:
-            _kbd_proc.terminate()
-            _kbd_proc = None
-        subprocess.run(["pkill", "-f", "matchbox-keyboard"], capture_output=True)
-        return jsonify({"status": "hidden"})
-
-    return jsonify({"error": "invalid action"}), 400
 
 
 # ── Search ────────────────────────────────────────────────────────────────────
@@ -218,7 +184,7 @@ def api_trending():
     return jsonify({"results": results})
 
 
-# ── WebSocket Remote ──────────────────────────────────────────────────────────
+# ── WebSocket ─────────────────────────────────────────────────────────────────
 
 VALID_COMMANDS = {"up", "down", "left", "right", "enter", "back", "home", "search"}
 

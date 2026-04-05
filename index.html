@@ -85,6 +85,42 @@
     #kbdBtn:hover { border-color: var(--accent); color: var(--accent); }
     #kbdBtn.active { background: rgba(232,0,61,0.15); border-color: var(--accent); color: var(--accent); }
 
+    /* ── On-screen keyboard ── */
+    #osk {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #0e0e1a;
+      border-top: 1.5px solid var(--border);
+      padding: 12px 16px 16px;
+      z-index: 400;
+      user-select: none;
+    }
+    #osk.open { display: block; }
+    .osk-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .osk-key {
+      min-width: 48px; height: 52px;
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-family: var(--font-body); font-size: 1rem; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background 0.1s, transform 0.08s;
+      flex-shrink: 0;
+    }
+    .osk-key:hover  { background: var(--card-h); border-color: #444; }
+    .osk-key:active { background: #2a2a3e; transform: scale(0.93); }
+    .osk-key.wide   { min-width: 80px; }
+    .osk-key.wider  { min-width: 120px; }
+    .osk-key.space  { min-width: 320px; }
+    .osk-key.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .osk-key.accent:hover { background: var(--accent-h); }
+    .osk-shift-active .osk-key[data-shift] { color: var(--accent); }
+
     /* Filter tabs */
     .tabs { display: flex; gap: 0.5rem; padding: 0.5rem 3rem 0; }
     .tab {
@@ -254,7 +290,7 @@
         <input id="searchInput" type="text" placeholder="Search movies & TV shows…" autocomplete="off" spellcheck="false" />
         <span class="search-icon">🔍</span>
       </div>
-      <!-- On-screen keyboard toggle — calls /api/keyboard on the Pi -->
+      <!-- On-screen keyboard toggle -->
       <button id="kbdBtn" title="Toggle on-screen keyboard">⌨</button>
       <button id="searchBtn" class="btn btn-red">Search</button>
     </div>
@@ -309,6 +345,63 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- On-screen keyboard -->
+<div id="osk">
+  <div class="osk-row">
+    <button class="osk-key" data-char="1" data-shift="!">1</button>
+    <button class="osk-key" data-char="2" data-shift="@">2</button>
+    <button class="osk-key" data-char="3" data-shift="#">3</button>
+    <button class="osk-key" data-char="4" data-shift="$">4</button>
+    <button class="osk-key" data-char="5" data-shift="%">5</button>
+    <button class="osk-key" data-char="6" data-shift="^">6</button>
+    <button class="osk-key" data-char="7" data-shift="&amp;">7</button>
+    <button class="osk-key" data-char="8" data-shift="*">8</button>
+    <button class="osk-key" data-char="9" data-shift="(">9</button>
+    <button class="osk-key" data-char="0" data-shift=")">0</button>
+    <button class="osk-key wide" data-action="backspace">&#x232B;</button>
+  </div>
+  <div class="osk-row">
+    <button class="osk-key" data-char="q">q</button>
+    <button class="osk-key" data-char="w">w</button>
+    <button class="osk-key" data-char="e">e</button>
+    <button class="osk-key" data-char="r">r</button>
+    <button class="osk-key" data-char="t">t</button>
+    <button class="osk-key" data-char="y">y</button>
+    <button class="osk-key" data-char="u">u</button>
+    <button class="osk-key" data-char="i">i</button>
+    <button class="osk-key" data-char="o">o</button>
+    <button class="osk-key" data-char="p">p</button>
+  </div>
+  <div class="osk-row">
+    <button class="osk-key" data-char="a">a</button>
+    <button class="osk-key" data-char="s">s</button>
+    <button class="osk-key" data-char="d">d</button>
+    <button class="osk-key" data-char="f">f</button>
+    <button class="osk-key" data-char="g">g</button>
+    <button class="osk-key" data-char="h">h</button>
+    <button class="osk-key" data-char="j">j</button>
+    <button class="osk-key" data-char="k">k</button>
+    <button class="osk-key" data-char="l">l</button>
+  </div>
+  <div class="osk-row">
+    <button class="osk-key wider" data-action="shift">&#x21E7; Shift</button>
+    <button class="osk-key" data-char="z">z</button>
+    <button class="osk-key" data-char="x">x</button>
+    <button class="osk-key" data-char="c">c</button>
+    <button class="osk-key" data-char="v">v</button>
+    <button class="osk-key" data-char="b">b</button>
+    <button class="osk-key" data-char="n">n</button>
+    <button class="osk-key" data-char="m">m</button>
+    <button class="osk-key" data-char="'" data-shift='"'>&apos;</button>
+    <button class="osk-key" data-char="-" data-shift="_">-</button>
+  </div>
+  <div class="osk-row">
+    <button class="osk-key wider" data-action="clear">&#x2715; Clear</button>
+    <button class="osk-key space" data-char=" ">space</button>
+    <button class="osk-key wider accent" data-action="search">Search &#x21B5;</button>
+  </div>
+</div>
 
 <script>
 // ── State ────────────────────────────────────────────────────────────────────
@@ -403,41 +496,95 @@ function fmtRuntime(m) {
 }
 
 // ── On-screen keyboard ───────────────────────────────────────────────────────
-// Toggles matchbox-keyboard on the Pi via the Flask /api/keyboard endpoint.
-// The ⌨ button lights up red when the keyboard is open.
-let kbdOpen = false;
-const kbdBtn = $("kbdBtn");
+// Pure in-page keyboard — no backend needed, all mouse-driven.
+const osk     = document.getElementById("osk");
+const kbdBtn  = $("kbdBtn");
+let kbdOpen   = false;
+let oskShift  = false;
 
-kbdBtn.addEventListener("click", toggleKeyboard);
-
-// Auto-open when the search input is clicked/focused with a mouse
-searchInput.addEventListener("pointerdown", () => {
-  if (!kbdOpen) toggleKeyboard();
-});
-
-// Auto-close when search input loses focus (user clicked elsewhere)
-searchInput.addEventListener("blur", () => {
-  if (kbdOpen) {
-    // Small delay so clicking the keyboard itself doesn't close it
-    setTimeout(() => {
-      if (document.activeElement !== searchInput) toggleKeyboard();
-    }, 200);
-  }
-});
-
-async function toggleKeyboard() {
-  kbdOpen = !kbdOpen;
-  kbdBtn.classList.toggle("active", kbdOpen);
-  try {
-    await fetch("/api/keyboard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: kbdOpen ? "show" : "hide" })
-    });
-  } catch (e) {
-    console.warn("Keyboard toggle failed:", e);
-  }
+function oskShow() {
+  kbdOpen = true;
+  osk.classList.add("open");
+  kbdBtn.classList.add("active");
 }
+function oskHide() {
+  kbdOpen = false;
+  osk.classList.remove("open");
+  kbdBtn.classList.remove("active");
+}
+function oskToggle() {
+  kbdOpen ? oskHide() : oskShow();
+}
+
+kbdBtn.addEventListener("click", oskToggle);
+
+// Auto-open when the search bar is clicked
+searchInput.addEventListener("pointerdown", () => {
+  if (!kbdOpen) oskShow();
+});
+
+// Handle all key presses via event delegation on the osk div
+osk.addEventListener("mousedown", (e) => {
+  // Prevent input from losing focus when clicking keyboard
+  e.preventDefault();
+
+  const key = e.target.closest(".osk-key");
+  if (!key) return;
+
+  const action = key.dataset.action;
+  const char   = key.dataset.char;
+  const shift  = key.dataset.shift;
+
+  if (action === "shift") {
+    oskShift = !oskShift;
+    osk.classList.toggle("osk-shift-active", oskShift);
+    // Update letter key labels
+    osk.querySelectorAll(".osk-key[data-char]").forEach(k => {
+      const c = k.dataset.char;
+      const s = k.dataset.shift;
+      if (c && c.match(/^[a-z]$/)) {
+        k.textContent = oskShift ? c.toUpperCase() : c;
+      } else if (s) {
+        k.textContent = oskShift ? s : c;
+      }
+    });
+    return;
+  }
+
+  if (action === "backspace") {
+    const val = searchInput.value;
+    searchInput.value = val.slice(0, -1);
+    return;
+  }
+
+  if (action === "clear") {
+    searchInput.value = "";
+    return;
+  }
+
+  if (action === "search") {
+    oskHide();
+    doSearch();
+    return;
+  }
+
+  if (char !== undefined) {
+    let insert = char;
+    if (oskShift) {
+      insert = key.dataset.shift || char.toUpperCase();
+      // Auto-unshift after one character
+      oskShift = false;
+      osk.classList.remove("osk-shift-active");
+      osk.querySelectorAll(".osk-key[data-char]").forEach(k => {
+        const c = k.dataset.char;
+        const s = k.dataset.shift;
+        if (c && c.match(/^[a-z]$/)) k.textContent = c;
+        else if (s) k.textContent = c;
+      });
+    }
+    searchInput.value += insert;
+  }
+});
 
 // ── Card builder ─────────────────────────────────────────────────────────────
 function buildCard(item) {
@@ -506,7 +653,7 @@ async function doSearch() {
   const q = searchInput.value.trim();
   if (!q) return;
   // Close keyboard after submitting search
-  if (kbdOpen) toggleKeyboard();
+  oskHide();
   trendingSection.style.display = "none";
   resultsSection.style.display = "block";
   resultsLabel.innerHTML = `Searching…`;
