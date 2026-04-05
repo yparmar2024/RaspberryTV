@@ -293,6 +293,7 @@
       <!-- On-screen keyboard toggle -->
       <button id="kbdBtn" title="Toggle on-screen keyboard">⌨</button>
       <button id="searchBtn" class="btn btn-red">Search</button>
+      <button id="homeBtn" class="btn btn-ghost">Home</button>
     </div>
   </header>
 
@@ -460,6 +461,7 @@ function handleRemoteCommand({ cmd, query }) {
 const $ = id => document.getElementById(id);
 const searchInput     = $("searchInput");
 const searchBtn       = $("searchBtn");
+const homeBtn         = $("homeBtn");
 const trendingGrid    = $("trendingGrid");
 const trendingSection = $("trendingSection");
 const resultsSection  = $("resultsSection");
@@ -647,6 +649,8 @@ function goHome() {
   loadTrending();
   setTimeout(() => { const c = trendingGrid.querySelector(".card"); if (c) c.focus(); }, 700);
 }
+
+homeBtn.addEventListener("click", goHome);
 
 // ── Search ────────────────────────────────────────────────────────────────────
 async function doSearch() {
